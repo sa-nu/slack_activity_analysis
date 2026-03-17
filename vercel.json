@@ -1,0 +1,14 @@
+{
+  "buildCommand": "",
+  "functions": {
+    "api/cron/daily-analysis.ts": {
+      "maxDuration": 120
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/daily-analysis",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}
