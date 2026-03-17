@@ -29,11 +29,11 @@ export interface MemberActivity {
   totalMessages: number;
   totalEstimatedMinutes: number;
   categories: TaskCategory[];
+  insight: string[];
 }
 
 export interface AnalysisResult {
   date: string;
   analyzedChannels: string[];
   memberActivities: MemberActivity[];
-  overallInsight: string;
 }

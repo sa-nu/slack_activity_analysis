@@ -49,6 +49,17 @@ function formatMemberSection(member: MemberActivity): KnownBlock[] {
     });
   }
 
+  if (member.insight.length > 0) {
+    const insightLines = member.insight.map((line) => `　• ${line}`).join("\n");
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*所見*\n${insightLines}`,
+      },
+    });
+  }
+
   return blocks;
 }
 
@@ -81,18 +92,6 @@ export function formatDmBlocks(
   });
 
   blocks.push({ type: "divider" });
-
-  // 全体所見
-  if (result.overallInsight) {
-    blocks.push({
-      type: "section",
-      text: {
-        type: "mrkdwn",
-        text: `*📝 全体所見*\n${result.overallInsight}`,
-      },
-    });
-    blocks.push({ type: "divider" });
-  }
 
   // メンバーごとのセクション
   if (result.memberActivities.length === 0) {

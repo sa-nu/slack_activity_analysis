@@ -26,11 +26,11 @@ interface ClaudeCategory {
 
 interface ClaudeMemberResult {
   categories: ClaudeCategory[];
+  insight: string[];
 }
 
 interface ClaudeAnalysisResult {
   members: { [userId: string]: ClaudeMemberResult };
-  overallInsight: string;
 }
 
 /**
@@ -94,10 +94,10 @@ ${membersData.join("\n\n")}
           "estimatedMinutes": 推定工数（分）,
           "examples": ["代表的なメッセージ例（最大2件、それぞれ50文字以内）"]
         }
-      ]
+      ],
+      "insight": ["このメンバーの業務傾向・特徴・気になる点を箇条書きで2〜4点"]
     }
-  },
-  "overallInsight": "チーム全体の業務傾向についての所見（3〜5文）"
+  }
 }
 
 カテゴリは以下の5つのみ使用してください：
@@ -109,6 +109,8 @@ ${membersData.join("\n\n")}
 
 推定工数（estimatedMinutes）はメッセージの複雑さや文量から推定してください。
 （例: 短い返信1件 ≒ 2〜5分、複雑な問い合わせ対応 ≒ 15〜30分）
+
+insightには、そのメンバーが本日注力した業務・特徴的な動き・効率化できそうな点などを記載してください。
 
 対象メンバーID一覧: ${memberIds.join(", ")}
 各メンバーIDをキーとして、全員のデータを含めてください。
@@ -152,7 +154,6 @@ export async function analyzeActivities(
       date,
       analyzedChannels: channelNames,
       memberActivities: [],
-      overallInsight: "本日は対象チャンネルにメッセージがありませんでした。",
     };
   }
 
@@ -189,6 +190,7 @@ export async function analyzeActivities(
       totalMessages: messages.length,
       totalEstimatedMinutes,
       categories,
+      insight: claudeMember?.insight ?? [],
     });
   }
 
@@ -201,6 +203,5 @@ export async function analyzeActivities(
     date,
     analyzedChannels: channelNames,
     memberActivities,
-    overallInsight: claudeResult.overallInsight ?? "",
   };
 }
