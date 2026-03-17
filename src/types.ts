@@ -5,6 +5,7 @@ export interface MemberMessage {
   channelName: string;
   text: string;
   ts: string;
+  permalink: string;
   threadReplyCount?: number;
   isThreadReply: boolean;
 }

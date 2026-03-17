@@ -46,33 +46,37 @@ function groupByMember(messages: MemberMessage[]): Map<string, MemberMessage[]> 
 }
 
 /**
- * メッセージをテキスト形式にフォーマットする（Claude へ渡す用）。
+ * [N] → <permalink|[ref]> に置換する。
  */
-function formatMessagesForPrompt(messages: MemberMessage[]): string {
-  return messages
-    .map((m) => {
-      const isReply = m.isThreadReply ? "[スレッド返信]" : "[メッセージ]";
-      const ch = `#${m.channelName}`;
-      const text = m.text.substring(0, 300);
-      return `${isReply} ${ch}: ${text}`;
-    })
-    .join("\n");
+function resolveRefs(text: string, permalinkMap: Map<number, string>): string {
+  return text.replace(/\[(\d+)\]/g, (_, num) => {
+    const link = permalinkMap.get(Number(num));
+    return link ? `<${link}|[ref]>` : "[ref]";
+  });
 }
 
 /**
  * 全メンバーのアクティビティをまとめてClaudeで分析する。
+ * 戻り値に permalinkMap も含める。
  */
 async function analyzeWithClaude(
   memberGroups: Map<string, MemberMessage[]>,
   date: string,
-): Promise<ClaudeAnalysisResult> {
+): Promise<{ result: ClaudeAnalysisResult; permalinkMap: Map<number, string> }> {
   const membersData: string[] = [];
+  const permalinkMap = new Map<number, string>();
+  let globalIndex = 1;
 
   for (const [userId, messages] of memberGroups) {
     const userName = messages[0].userName;
-    const formattedMessages = formatMessagesForPrompt(messages);
+    const lines = messages.map((m) => {
+      const num = globalIndex++;
+      permalinkMap.set(num, m.permalink);
+      const isReply = m.isThreadReply ? "[スレッド返信]" : "[メッセージ]";
+      return `[${num}] ${isReply} #${m.channelName}: ${m.text.substring(0, 300)}`;
+    });
     membersData.push(
-      `=== メンバーID: ${userId} / 名前: ${userName} (${messages.length}件) ===\n${formattedMessages}`,
+      `=== メンバーID: ${userId} / 名前: ${userName} (${messages.length}件) ===\n${lines.join("\n")}`,
     );
   }
 
@@ -95,7 +99,7 @@ ${membersData.join("\n\n")}
           "examples": ["代表的なメッセージ例（最大2件、それぞれ50文字以内）"]
         }
       ],
-      "insight": ["このメンバーの業務傾向・特徴・気になる点を箇条書きで2〜4点"]
+      "insight": ["このメンバーの業務傾向・特徴・気になる点を箇条書きで2〜4点（根拠となるメッセージ番号を [N] 形式で末尾に付ける）"]
     }
   }
 }
@@ -111,6 +115,7 @@ ${membersData.join("\n\n")}
 （例: 短い返信1件 ≒ 2〜5分、複雑な問い合わせ対応 ≒ 15〜30分）
 
 insightには、そのメンバーが本日注力した業務・特徴的な動き・効率化できそうな点などを記載してください。
+各insightの末尾に、根拠となるメッセージの番号を [N] の形式で1〜3個付けてください。（例: "顧客からの問い合わせ対応が中心だった [3] [7]"）
 
 対象メンバーID一覧: ${memberIds.join(", ")}
 各メンバーIDをキーとして、全員のデータを含めてください。
@@ -135,7 +140,7 @@ JSONのみを出力してください。`;
     throw new Error("Claude API の応答から JSON を抽出できませんでした");
   }
 
-  return JSON.parse(jsonMatch[0]) as ClaudeAnalysisResult;
+  return { result: JSON.parse(jsonMatch[0]) as ClaudeAnalysisResult, permalinkMap };
 }
 
 /**
@@ -158,7 +163,7 @@ export async function analyzeActivities(
   }
 
   const memberGroups = groupByMember(messages);
-  const claudeResult = await analyzeWithClaude(memberGroups, date);
+  const { result: claudeResult, permalinkMap } = await analyzeWithClaude(memberGroups, date);
 
   const memberActivities: MemberActivity[] = [];
 
@@ -190,7 +195,9 @@ export async function analyzeActivities(
       totalMessages: messages.length,
       totalEstimatedMinutes,
       categories,
-      insight: claudeMember?.insight ?? [],
+      insight: (claudeMember?.insight ?? []).map((line) =>
+        resolveRefs(line, permalinkMap),
+      ),
     });
   }
 

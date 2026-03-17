@@ -9,6 +9,19 @@ const botClient = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 const userNameCache = new Map<string, string>();
 const channelNameCache = new Map<string, string>();
+let workspaceUrl: string | null = null;
+
+async function getWorkspaceUrl(): Promise<string> {
+  if (workspaceUrl) return workspaceUrl;
+  const res = await readerClient.auth.test();
+  workspaceUrl = (res.url as string).replace(/\/$/, "");
+  return workspaceUrl;
+}
+
+function buildPermalink(baseUrl: string, channelId: string, ts: string): string {
+  const tsNum = ts.replace(".", "");
+  return `${baseUrl}/archives/${channelId}/p${tsNum}`;
+}
 
 async function resolveUserName(userId: string): Promise<string> {
   if (userNameCache.has(userId)) return userNameCache.get(userId)!;
@@ -86,7 +99,10 @@ export async function fetchMemberMessages(
   }
 
   console.log(`  対象メンバー: ${targetMemberIds.length}名 — チャンネル一覧を取得中...`);
-  const channelIds = await getMemberChannelIds(targetMemberIds);
+  const [channelIds, baseUrl] = await Promise.all([
+    getMemberChannelIds(targetMemberIds),
+    getWorkspaceUrl(),
+  ]);
   console.log(`  取得チャンネル数: ${channelIds.length}`);
 
   const now = Math.floor(Date.now() / 1000);
@@ -122,6 +138,7 @@ export async function fetchMemberMessages(
             channelName,
             text: msg.text ?? "",
             ts: msg.ts,
+            permalink: buildPermalink(baseUrl, channelId, msg.ts),
             threadReplyCount: msg.reply_count ?? 0,
             isThreadReply: false,
           });
@@ -133,6 +150,7 @@ export async function fetchMemberMessages(
               msg.thread_ts,
               oldest,
               targetMemberIds,
+              baseUrl,
             );
             allMessages.push(...threadReplies);
           }
@@ -160,6 +178,7 @@ async function fetchThreadReplies(
   threadTs: string,
   oldest: number,
   targetMemberIds: string[],
+  baseUrl: string,
 ): Promise<MemberMessage[]> {
   const replies: MemberMessage[] = [];
   let cursor: string | undefined;
@@ -186,6 +205,7 @@ async function fetchThreadReplies(
         channelName,
         text: msg.text ?? "",
         ts: msg.ts,
+        permalink: buildPermalink(baseUrl, channelId, msg.ts),
         isThreadReply: true,
       });
     }
