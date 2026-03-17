@@ -78,7 +78,7 @@ async function analyzeWithClaude(
 
   const memberIds = [...memberGroups.keys()];
   const prompt = `あなたはカスタマーサポートチームのマネージャーです。
-以下は本日（${date}）のCSチームメンバーのSlackメッセージ一覧です。
+以下は本日（${date}）のCSpチームメンバーのSlackメッセージ一覧です。
 
 ${membersData.join("\n\n")}
 

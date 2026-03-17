@@ -22,7 +22,7 @@ export async function runDailyAnalysis(): Promise<{
     throw new Error("MY_SLACK_USER_ID が設定されていません");
   }
 
-  console.log(`[${date}] CSチーム業務分析を開始...`);
+  console.log(`[${date}] CSpチーム業務分析を開始...`);
 
   try {
     const messages = await fetchMemberMessages(24);
@@ -32,7 +32,7 @@ export async function runDailyAnalysis(): Promise<{
     console.log(`  分析完了 (メンバー数: ${result.memberActivities.length})`);
 
     const blocks = formatDmBlocks(result, myUserId);
-    const fallbackText = `${date} CSチーム業務分析サマリー (${result.memberActivities.length}名)`;
+    const fallbackText = `${date} CSpチーム業務分析サマリー (${result.memberActivities.length}名)`;
 
     await sendDm(myUserId, blocks, fallbackText);
     console.log(`  DM送信完了 (宛先: ${myUserId})`);

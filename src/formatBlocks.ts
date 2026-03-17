@@ -77,7 +77,7 @@ export function formatDmBlocks(
     type: "header",
     text: {
       type: "plain_text",
-      text: `📊 CSチーム 業務分析サマリー (${result.date})`,
+      text: `📊 CSpチーム 業務分析サマリー (${result.date})`,
       emoji: true,
     },
   });
