@@ -38,20 +38,51 @@ async function getChannelName(channelId: string): Promise<string> {
 }
 
 /**
- * 複数チャンネルから過去 hours 時間分のメッセージを取得する。
- * スレッドの返信も含む。Bot・システムメッセージは除外。
+ * 指定メンバーが所属するパブリックチャンネル一覧を取得する。
+ * 複数メンバーの場合は和集合を返す。
+ */
+async function getMemberChannelIds(memberIds: string[]): Promise<string[]> {
+  const channelSet = new Set<string>();
+
+  for (const userId of memberIds) {
+    let cursor: string | undefined;
+    do {
+      const res = await client.users.conversations({
+        user: userId,
+        types: "public_channel",
+        exclude_archived: true,
+        limit: 200,
+        cursor,
+      });
+      for (const ch of res.channels ?? []) {
+        if (ch.id) channelSet.add(ch.id);
+      }
+      cursor = res.response_metadata?.next_cursor;
+    } while (cursor);
+  }
+
+  return [...channelSet];
+}
+
+/**
+ * 指定メンバーのパブリックチャンネル全体から過去 hours 時間分のメッセージを取得する。
+ * CS_MEMBER_IDS が必須。Bot・システムメッセージは除外。スレッド返信も含む。
  */
 export async function fetchMemberMessages(
   hours: number = 24,
 ): Promise<MemberMessage[]> {
-  const channelIds = (process.env.SLACK_CHANNEL_IDS ?? "")
+  const targetMemberIds = (process.env.CS_MEMBER_IDS ?? "")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean);
 
-  if (channelIds.length === 0) {
-    throw new Error("SLACK_CHANNEL_IDS が設定されていません");
+  if (targetMemberIds.length === 0) {
+    throw new Error("CS_MEMBER_IDS が設定されていません");
   }
+
+  console.log(`  対象メンバー: ${targetMemberIds.length}名 — チャンネル一覧を取得中...`);
+  const channelIds = await getMemberChannelIds(targetMemberIds);
+  console.log(`  取得チャンネル数: ${channelIds.length}`);
 
   const now = Math.floor(Date.now() / 1000);
   const oldest = now - hours * 60 * 60;
@@ -75,6 +106,7 @@ export async function fetchMemberMessages(
       for (const msg of messages) {
         if (!msg.ts || !msg.user || msg.subtype) continue;
         if (msg.bot_id) continue;
+        if (!targetMemberIds.includes(msg.user)) continue;
 
         const userName = await resolveUserName(msg.user);
 
@@ -97,6 +129,7 @@ export async function fetchMemberMessages(
             channelName,
             msg.thread_ts,
             oldest,
+            targetMemberIds,
           );
           allMessages.push(...threadReplies);
         }
@@ -114,6 +147,7 @@ async function fetchThreadReplies(
   channelName: string,
   threadTs: string,
   oldest: number,
+  targetMemberIds: string[],
 ): Promise<MemberMessage[]> {
   const replies: MemberMessage[] = [];
   let cursor: string | undefined;
@@ -132,6 +166,7 @@ async function fetchThreadReplies(
     for (const msg of messages.slice(1)) {
       if (!msg.ts || !msg.user || msg.subtype) continue;
       if (msg.bot_id) continue;
+      if (!targetMemberIds.includes(msg.user)) continue;
 
       const userName = await resolveUserName(msg.user);
       replies.push({
